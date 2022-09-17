@@ -112,3 +112,62 @@ func EditAUser() gin.HandlerFunc {
 		c.JSON(http.StatusOK, responses.UserResponse{Id: http.StatusOK, Name: "success", Data: map[string]interface{}{"data": updatedUser}})
 	}
 }
+
+
+func DeleteAUser() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        userId := c.Param("userId")
+        defer cancel()
+
+        objId, _ := primitive.ObjectIDFromHex(userId)
+
+        result, err := userCollection.DeleteOne(ctx, bson.M{"id": objId})
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, responses.UserResponse{Id: http.StatusInternalServerError, Name: "error", Data: map[string]interface{}{"data": err.Error()}})
+            return
+        }
+
+        if result.DeletedCount < 1 {
+            c.JSON(http.StatusNotFound,
+                responses.UserResponse{Id: http.StatusNotFound, Name: "error", Data: map[string]interface{}{"data": "User with specified ID not found!"}},
+            )
+            return
+        }
+
+        c.JSON(http.StatusOK,
+            responses.UserResponse{Id: http.StatusOK, Name: "success", Data: map[string]interface{}{"data": "User successfully deleted!"}},
+        )
+    }
+}
+
+
+func GetAllUsers() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        var users []models.User
+        defer cancel()
+
+        results, err := userCollection.Find(ctx, bson.M{})
+
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, responses.UserResponse{Id: http.StatusInternalServerError, Name: "error", Data: map[string]interface{}{"data": err.Error()}})
+            return
+        }
+
+		//read from mongodb cursor
+        defer results.Close(ctx)
+        for results.Next(ctx) {
+            var singleUser models.User
+            if err = results.Decode(&singleUser); err != nil {
+                c.JSON(http.StatusInternalServerError, responses.UserResponse{Id: http.StatusInternalServerError, Name: "error", Data: map[string]interface{}{"data": err.Error()}})
+            }
+
+            users = append(users, singleUser)
+        }
+
+        c.JSON(http.StatusOK,
+            responses.UserResponse{Id: http.StatusOK, Name: "success", Data: map[string]interface{}{"data": users}},
+        )
+    }
+}
